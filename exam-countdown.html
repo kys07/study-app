@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="合格まで">
+<title>公認会計士試験 学習管理</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=Bebas+Neue&display=swap');
+
+:root {
+  --bg: #0b0f1a;
+  --surface: #111827;
+  --surface2: #1a2235;
+  --accent: #4f8ef7;
+  --accent2: #a78bfa;
+  --green: #34d399;
+  --warn: #f97316;
+  --red: #f87171;
+  --text: #e8ecf4;
+  --muted: #6b7a99;
+  --border: rgba(255,255,255,0.07);
+  --subjects: #4f8ef7,#a78bfa,#34d399,#f97316,#f87171,#fbbf24;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* ===== GRID BG ===== */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(79,142,247,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,142,247,0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+  pointer-events:none; z-index:0;
+}
+
+/* ===== SCROLL AREA ===== */
+.scroll-area {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding: 16px 16px 80px;
+  position:relative; z-index:1;
+}
+
+/* ===== BOTTOM NAV ===== */
+.nav {
+  display:flex;
+  background: rgba(17,24,39,0.97);
+  border-top: 1px solid var(--border);
+  position:relative; z-index:10;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.nav-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  padding: 10px 4px 8px;
+  background:none; border:none; cursor:pointer;
+  color: var(--muted); font-family:'Noto Sans JP',sans-serif;
+  font-size:9px; letter-spacing:0.05em; gap:4px;
+  transition: color 0.2s;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-btn svg { width:22px; height:22px; stroke-width:1.8; fill:none; stroke:currentColor; }
+
+/* ===== PAGES ===== */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ===== CARD ===== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 12px;
+  position:relative; overflow:hidden;
+}
+.card-title {
+  font-size:10px; letter-spacing:0.18em; color:var(--muted);
+  text-transform:uppercase; margin-bottom:14px;
+}
+
+/* ===== DASHBOARD ===== */
+.days-hero {
+  text-align:center; padding: 8px 0 4px;
+}
+.days-hero .big {
+  font-family:'Bebas Neue',sans-serif;
+  font-size: clamp(88px,22vw,130px);
+  line-height:0.88;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text; letter-spacing:2px;
+}
+.days-hero .sub {
+  font-size:12px; color:var(--muted); letter-spacing:0.1em; margin-top:4px;
+}
+.exam-label {
+  text-align:center; font-size:12px; color:var(--muted);
+  padding: 10px 0 0;
+}
+.exam-label strong { color:var(--accent); font-weight:400; }
+
+.stats-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;
+}
+.stat-mini {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius:12px; padding:14px 12px;
+}
+.stat-mini .lbl { font-size:10px; color:var(--muted); line-height:1.5; margin-bottom:4px; }
+.stat-mini .val {
+  font-family:'Bebas Neue',sans-serif; font-size:28px; line-height:1; color:var(--text);
+  letter-spacing:1px;
+}
+.stat-mini .val small { font-family:'Noto Sans JP',sans-serif; font-size:10px; color:var(--muted); margin-left:2px; }
+.stat-mini .val.orange { color:var(--warn); }
+.stat-mini .val.green  { color:var(--green); }
+
+/* Today progress */
+.prog-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.prog-lbl { font-size:10px; color:var(--muted); letter-spacing:0.1em; }
+.prog-pct { font-size:10px; color:var(--accent); }
+.bar { height:5px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+.bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px; transition:width 0.6s ease; }
+
+/* today schedule preview */
+.today-schedule { margin-top:14px; }
+.ts-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 8px 0; border-bottom:1px solid var(--border);
+  font-size:13px;
+}
+.ts-row:last-child { border-bottom:none; }
+.ts-dot { width:8px; height:8px; border-radius:50%; margin-right:10px; flex-shrink:0; }
+.ts-name { flex:1; }
+.ts-planned { color:var(--muted); font-size:12px; }
+
+/* rest day banner */
+.rest-banner {
+  text-align:center; padding:32px 16px;
+  color:var(--muted); font-size:14px; line-height:2;
+}
+.rest-banner .big-emoji { font-size:48px; display:block; margin-bottom:8px; }
+
+/* ===== TODAY LOG ===== */
+.log-date { font-size:13px; color:var(--muted); margin-bottom:16px; text-align:center; }
+.log-item {
+  display:flex; align-items:center; gap:12px;
+  padding: 12px 0; border-bottom:1px solid var(--border);
+}
+.log-item:last-child { border-bottom:none; }
+.log-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.log-info { flex:1; }
+.log-name { font-size:13px; margin-bottom:2px; }
+.log-planned { font-size:10px; color:var(--muted); }
+.log-input-wrap { display:flex; align-items:center; gap:6px; }
+.log-input {
+  width:60px; text-align:right;
+  background: var(--surface2); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:14px; font-family:'Noto Sans JP',sans-serif;
+  padding:7px 8px; outline:none; -webkit-appearance:none; appearance:none;
+}
+.log-input:focus { border-color:var(--accent); }
+.log-unit { font-size:11px; color:var(--muted); }
+
+.save-btn {
+  width:100%; padding:13px; margin-top:16px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:12px; color:#fff;
+  font-family:'Noto Sans JP',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:0.1em; cursor:pointer; transition:opacity 0.2s,transform 0.1s;
+}
+.save-btn:active { opacity:0.8; transform:scale(0.98); }
+
+.log-total {
+  text-align:center; font-size:12px; color:var(--muted); margin-top:12px;
+}
+.log-total strong { color:var(--green); font-size:16px; }
+
+/* toast */
+.toast {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--green); color:#0b0f1a; font-size:13px; font-weight:700;
+  padding:10px 24px; border-radius:99px; z-index:100;
+  opacity:0; transition:opacity 0.3s,transform 0.3s; white-space:nowrap;
+  pointer-events:none;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ===== SCHEDULE ===== */
+.day-tabs {
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;
+  scrollbar-width:none;
+}
+.day-tabs::-webkit-scrollbar { display:none; }
+.day-tab {
+  flex-shrink:0; padding:6px 12px; border-radius:99px;
+  border:1px solid var(--border); background:none; color:var(--muted);
+  font-size:12px; font-family:'Noto Sans JP',sans-serif; cursor:pointer;
+  transition: all 0.2s;
+}
+.day-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.day-tab.rest { border-color:var(--red); color:var(--red); }
+.day-tab.rest.active { background:var(--red); color:#fff; }
+
+.schedule-panel { display:none; }
+.schedule-panel.active { display:block; }
+
+.rest-toggle-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid var(--border); margin-bottom:14px;
+}
+.rest-toggle-label { font-size:13px; }
+.toggle {
+  width:44px; height:24px; background:var(--surface2); border:1px solid var(--border);
+  border-radius:99px; position:relative; cursor:pointer; transition:background 0.2s;
+  flex-shrink:0;
+}
+.toggle.on { background:var(--accent); border-color:var(--accent); }
+.toggle-thumb {
+  width:18px; height:18px; border-radius:50%; background:#fff;
+  position:absolute; top:2px; left:2px; transition:left 0.2s;
+}
+.toggle.on .toggle-thumb { left:22px; }
+
+.sched-row {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 0; border-bottom:1px solid var(--border);
+}
+.sched-row:last-child { border-bottom:none; }
+.sched-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.sched-name { flex:1; font-size:13px; }
+.sched-input {
+  width:56px; text-align:right;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:14px; font-family:'Noto Sans JP',sans-serif;
+  padding:7px 8px; outline:none; -webkit-appearance:none; appearance:none;
+}
+.sched-input:focus { border-color:var(--accent); }
+.sched-unit { font-size:11px; color:var(--muted); }
+.sched-total { text-align:right; font-size:11px; color:var(--muted); margin-top:10px; }
+.sched-total span { color:var(--accent); }
+
+/* ===== STATS ===== */
+.subject-card {
+  margin-bottom:12px;
+}
+.subj-header {
+  display:flex; align-items:center; gap:10px; margin-bottom:10px;
+}
+.subj-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.subj-name { flex:1; font-size:14px; }
+.subj-total {
+  font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:1px;
+}
+.subj-bar-wrap { height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+.subj-bar-fill { height:100%; border-radius:3px; transition:width 0.6s ease; }
+.subj-meta { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; }
+
+.total-summary {
+  text-align:center; padding:20px 0 8px;
+}
+.total-summary .big {
+  font-family:'Bebas Neue',sans-serif; font-size:56px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  line-height:1;
+}
+.total-summary .lbl { font-size:11px; color:var(--muted); margin-top:4px; letter-spacing:0.1em; }
+
+/* ===== SETTINGS ===== */
+.settings-group { margin-bottom:16px; }
+.settings-row {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 0; border-bottom:1px solid var(--border);
+}
+.settings-row:last-child { border-bottom:none; }
+.settings-lbl { flex:1; font-size:13px; }
+.settings-input {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:14px; font-family:'Noto Sans JP',sans-serif;
+  padding:8px 10px; outline:none; -webkit-appearance:none; appearance:none;
+  color-scheme:dark; width:160px; text-align:right;
+}
+.settings-input:focus { border-color:var(--accent); }
+
+.hint { font-size:10px; color:rgba(107,122,153,0.45); text-align:center; line-height:1.9; margin-top:8px; letter-spacing:0.04em; }
+
+/* section heading */
+.section-heading {
+  font-size:10px; letter-spacing:0.18em; color:var(--muted);
+  text-transform:uppercase; margin: 4px 0 10px; padding-left:2px;
+}
+</style>
+</head>
+<body>
+
+<div class="scroll-area" id="scrollArea">
+
+  <!-- ===== PAGE: DASHBOARD ===== -->
+  <div class="page active" id="page-dash">
+
+    <div id="restBanner" class="rest-banner" style="display:none">
+      <span class="big-emoji">☕</span>
+      今日は火曜日。<br>しっかり休んで明日に備えよう。
+    </div>
+
+    <div id="dashMain">
+      <div class="card">
+        <div class="days-hero">
+          <span class="big" id="dDays">–</span>
+          <div class="sub">日</div>
+        </div>
+        <div class="exam-label" id="dExamLabel">試験日を設定してください</div>
+
+        <div class="stats-row">
+          <div class="stat-mini">
+            <div class="lbl">残り勉強時間<br>（全日合計）</div>
+            <div class="val orange" id="dTotalH">–<small>h</small></div>
+          </div>
+          <div class="stat-mini">
+            <div class="lbl">今日の<br>目標合計</div>
+            <div class="val" id="dTodayH">–<small>h</small></div>
+          </div>
+          <div class="stat-mini">
+            <div class="lbl">残り週数</div>
+            <div class="val" id="dWeeks">–<small>週</small></div>
+          </div>
+          <div class="stat-mini">
+            <div class="lbl">今週の<br>勉強日数</div>
+            <div class="val green" id="dStudyDays">–<small>日</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="todaySchedCard">
+        <div class="card-title">今日のスケジュール</div>
+        <div class="today-schedule" id="todaySchedList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: TODAY LOG ===== -->
+  <div class="page" id="page-log">
+    <div class="card">
+      <div class="card-title">今日の学習記録</div>
+      <div class="log-date" id="logDate"></div>
+      <div id="logList"></div>
+      <div class="log-total" id="logTotal"></div>
+      <button class="save-btn" onclick="saveLog()">記録を保存する</button>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: SCHEDULE ===== -->
+  <div class="page" id="page-sched">
+    <div class="card">
+      <div class="card-title">週間スケジュール設定</div>
+      <div class="day-tabs" id="dayTabs"></div>
+      <div id="dayPanels"></div>
+      <button class="save-btn" onclick="saveSchedule()">スケジュールを保存する</button>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: STATS ===== -->
+  <div class="page" id="page-stats">
+    <div class="card">
+      <div class="total-summary">
+        <div class="big" id="sTotalH">0</div>
+        <div class="lbl">TOTAL HOURS STUDIED</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">科目別 累積学習時間</div>
+      <div id="subjectBars"></div>
+    </div>
+    <div class="card" id="recentCard">
+      <div class="card-title">直近7日の記録</div>
+      <div id="recentLog"></div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: SETTINGS ===== -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <div class="card-title">基本設定</div>
+      <div class="settings-group">
+        <div class="settings-row">
+          <span class="settings-lbl">試験日</span>
+          <input class="settings-input" type="date" id="sExamDate" style="width:auto;flex:1;max-width:180px">
+        </div>
+      </div>
+      <button class="save-btn" onclick="saveBasicSettings()">保存する</button>
+    </div>
+    <div class="hint">
+      📱 iPhoneの場合：Safariで開き「共有」→「ホーム画面に追加」<br>でアプリのようにホーム画面から起動できます
+    </div>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<!-- Bottom Nav -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="goPage('dash',this)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    ホーム
+  </button>
+  <button class="nav-btn" onclick="goPage('log',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    今日の記録
+  </button>
+  <button class="nav-btn" onclick="goPage('sched',this)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    スケジュール
+  </button>
+  <button class="nav-btn" onclick="goPage('stats',this)">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    統計
+  </button>
+  <button class="nav-btn" onclick="goPage('settings',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    設定
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const SUBJECTS = [
+  { id:'fc', name:'財務会計 計算', color:'#4f8ef7' },
+  { id:'ft', name:'財務会計 理論', color:'#a78bfa' },
+  { id:'mc', name:'管理会計 計算', color:'#34d399' },
+  { id:'mt', name:'管理会計 理論', color:'#f97316' },
+  { id:'co', name:'企業法',         color:'#f87171' },
+  { id:'au', name:'監査論',         color:'#fbbf24' },
+];
+
+const DAYS = ['日','月','火','水','木','金','土'];
+// 火曜=2 をデフォルト休み
+const DEFAULT_SCHEDULE = {
+  0: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+  1: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+  2: { rest:true,  hours:{ fc:0, ft:0, mc:0, mt:0, co:0, au:0 } },
+  3: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+  4: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+  5: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+  6: { rest:false, hours:{ fc:1.5, ft:1.5, mc:1.5, mt:1.5, co:1.5, au:1.5 } },
+};
+
+function load(key, def) {
+  try { const v=localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e){ return def; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+function getSchedule() { return load('schedule', DEFAULT_SCHEDULE); }
+function getExamDate() { return localStorage.getItem('examDate') || ''; }
+// logs: { 'YYYY-MM-DD': { fc:1.5, ft:0, ... } }
+function getLogs() { return load('logs', {}); }
+
+function todayKey() {
+  const n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+}
+
+// ============================================================
+// NAV
+// ============================================================
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('scrollArea').scrollTop = 0;
+  if(id==='dash') renderDash();
+  if(id==='log')  renderLog();
+  if(id==='sched') renderSched();
+  if(id==='stats') renderStats();
+  if(id==='settings') renderSettings();
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDash() {
+  const examDate = getExamDate();
+  const sched    = getSchedule();
+  const now      = new Date();
+  const dow      = now.getDay();
+  const todaySched = sched[dow] || { rest:true, hours:{} };
+
+  // rest banner
+  const restBanner = document.getElementById('restBanner');
+  const dashMain   = document.getElementById('dashMain');
+  if(todaySched.rest) {
+    restBanner.style.display = 'block';
+    // still show stats below
+  } else {
+    restBanner.style.display = 'none';
+  }
+
+  if(!examDate) {
+    document.getElementById('dDays').textContent = '–';
+    document.getElementById('dExamLabel').innerHTML = '試験日を設定してください';
+    document.getElementById('dTotalH').innerHTML = '–<small>h</small>';
+    document.getElementById('dTodayH').innerHTML = '–<small>h</small>';
+    document.getElementById('dWeeks').innerHTML = '–<small>週</small>';
+    document.getElementById('dStudyDays').innerHTML = '–<small>日</small>';
+    renderTodaySched(todaySched);
+    return;
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const exam  = new Date(examDate + 'T00:00:00');
+  const examDay = new Date(exam.getFullYear(), exam.getMonth(), exam.getDate());
+  const msDay = 86400000;
+  const daysLeft = Math.max(0, Math.ceil((examDay - today) / msDay));
+  const weeksLeft = Math.floor(daysLeft / 7);
+
+  // count study days and total hours remaining
+  let studyDaysLeft = 0, totalHoursLeft = 0;
+  for(let i=0; i<daysLeft; i++) {
+    const d = new Date(today.getTime() + i*msDay);
+    const ds = sched[d.getDay()] || { rest:true, hours:{} };
+    if(!ds.rest) {
+      studyDaysLeft++;
+      totalHoursLeft += SUBJECTS.reduce((s,sub)=>{
+        return s + (parseFloat(ds.hours[sub.id])||0);
+      },0);
+    }
+  }
+
+  // today total
+  const todayTotal = todaySched.rest ? 0 : SUBJECTS.reduce((s,sub)=>{
+    return s + (parseFloat(todaySched.hours[sub.id])||0);
+  },0);
+
+  // this week study days remaining (Sun-Sat week)
+  let weekStudy = 0;
+  for(let d=0; d<7; d++) {
+    if(!(sched[d] && sched[d].rest)) weekStudy++;
+  }
+
+  document.getElementById('dDays').textContent = daysLeft;
+  const opts = {year:'numeric',month:'long',day:'numeric'};
+  const examStr = examDay.toLocaleDateString('ja-JP',opts);
+  document.getElementById('dExamLabel').innerHTML = `試験日 <strong>${examStr}</strong>`;
+  document.getElementById('dTotalH').innerHTML = `${Math.round(totalHoursLeft)}<small>h</small>`;
+  document.getElementById('dTodayH').innerHTML = `${todayTotal.toFixed(1)}<small>h</small>`;
+  document.getElementById('dWeeks').innerHTML = `${weeksLeft}<small>週</small>`;
+  document.getElementById('dStudyDays').innerHTML = `${weekStudy}<small>日</small>`;
+
+  renderTodaySched(todaySched);
+}
+
+function renderTodaySched(todaySched) {
+  const el = document.getElementById('todaySchedList');
+  if(todaySched.rest) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:12px 0">今日は休息日です</div>';
+    return;
+  }
+  el.innerHTML = SUBJECTS.map(sub=>{
+    const h = parseFloat(todaySched.hours[sub.id])||0;
+    return `<div class="ts-row">
+      <span class="ts-dot" style="background:${sub.color}"></span>
+      <span class="ts-name">${sub.name}</span>
+      <span class="ts-planned">${h>0?h+'h':'–'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// LOG PAGE
+// ============================================================
+function renderLog() {
+  const sched   = getSchedule();
+  const logs    = getLogs();
+  const now     = new Date();
+  const key     = todayKey();
+  const todayLog= logs[key] || {};
+  const dow     = now.getDay();
+  const todaySched = sched[dow] || { rest:true, hours:{} };
+
+  const opts = {year:'numeric',month:'long',day:'numeric',weekday:'long'};
+  document.getElementById('logDate').textContent = now.toLocaleDateString('ja-JP',opts);
+
+  if(todaySched.rest) {
+    document.getElementById('logList').innerHTML =
+      '<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px 0">今日は休息日です 🌙</div>';
+    document.getElementById('logTotal').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('logList').innerHTML = SUBJECTS.map(sub=>{
+    const planned = parseFloat(todaySched.hours[sub.id])||0;
+    const logged  = todayLog[sub.id] !== undefined ? todayLog[sub.id] : '';
+    return `<div class="log-item">
+      <span class="log-dot" style="background:${sub.color}"></span>
+      <div class="log-info">
+        <div class="log-name">${sub.name}</div>
+        <div class="log-planned">目標 ${planned>0?planned+'h':'未設定'}</div>
+      </div>
+      <div class="log-input-wrap">
+        <input class="log-input" type="number" step="0.5" min="0" max="24"
+          id="linput_${sub.id}" value="${logged}" placeholder="0"
+          oninput="updateLogTotal()">
+        <span class="log-unit">h</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateLogTotal();
+}
+
+function updateLogTotal() {
+  const total = SUBJECTS.reduce((s,sub)=>{
+    return s + (parseFloat(document.getElementById('linput_'+sub.id)?.value)||0);
+  },0);
+  document.getElementById('logTotal').innerHTML =
+    `今日の合計: <strong>${total.toFixed(1)}h</strong>`;
+}
+
+function saveLog() {
+  const logs = getLogs();
+  const key  = todayKey();
+  const entry = {};
+  SUBJECTS.forEach(sub=>{
+    entry[sub.id] = parseFloat(document.getElementById('linput_'+sub.id)?.value)||0;
+  });
+  logs[key] = entry;
+  save('logs', logs);
+  showToast('保存しました ✓');
+}
+
+// ============================================================
+// SCHEDULE PAGE
+// ============================================================
+let activeDayTab = 0;
+
+function renderSched() {
+  const sched = getSchedule();
+  const tabsEl   = document.getElementById('dayTabs');
+  const panelsEl = document.getElementById('dayPanels');
+
+  tabsEl.innerHTML = DAYS.map((d,i)=>{
+    const isRest = sched[i] && sched[i].rest;
+    const isActive = i===activeDayTab;
+    return `<button class="day-tab${isRest?' rest':''}${isActive?' active':''}"
+      onclick="switchDayTab(${i})">${d}</button>`;
+  }).join('');
+
+  panelsEl.innerHTML = DAYS.map((d,i)=>{
+    const ds = sched[i] || { rest:false, hours:{} };
+    const isActive = i===activeDayTab;
+    const totalH = SUBJECTS.reduce((s,sub)=>s+(parseFloat(ds.hours[sub.id])||0),0);
+    return `<div class="schedule-panel${isActive?' active':''}" id="spanel_${i}">
+      <div class="rest-toggle-row">
+        <span class="rest-toggle-label">休息日にする</span>
+        <div class="toggle${ds.rest?' on':''}" id="restToggle_${i}" onclick="toggleRest(${i})">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div id="schedInputs_${i}" style="${ds.rest?'opacity:0.3;pointer-events:none':''}">
+        ${SUBJECTS.map(sub=>{
+          const h = ds.hours[sub.id] !== undefined ? ds.hours[sub.id] : '';
+          return `<div class="sched-row">
+            <span class="sched-dot" style="background:${sub.color}"></span>
+            <span class="sched-name">${sub.name}</span>
+            <input class="sched-input" type="number" step="0.5" min="0" max="24"
+              id="sinput_${i}_${sub.id}" value="${h}" placeholder="0"
+              oninput="updateSchedTotal(${i})">
+            <span class="sched-unit">h</span>
+          </div>`;
+        }).join('')}
+        <div class="sched-total" id="schedTotal_${i}">合計 <span>${totalH.toFixed(1)}</span>h</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchDayTab(i) {
+  activeDayTab = i;
+  document.querySelectorAll('.day-tab').forEach((t,idx)=>{
+    t.classList.toggle('active', idx===i);
+  });
+  document.querySelectorAll('.schedule-panel').forEach((p,idx)=>{
+    p.classList.toggle('active', idx===i);
+  });
+}
+
+function toggleRest(i) {
+  const toggle = document.getElementById('restToggle_'+i);
+  const inputs = document.getElementById('schedInputs_'+i);
+  const isOn   = toggle.classList.toggle('on');
+  inputs.style.opacity = isOn?'0.3':'1';
+  inputs.style.pointerEvents = isOn?'none':'auto';
+  // update tab style
+  document.querySelectorAll('.day-tab')[i].classList.toggle('rest', isOn);
+}
+
+function updateSchedTotal(i) {
+  const total = SUBJECTS.reduce((s,sub)=>{
+    return s+(parseFloat(document.getElementById(`sinput_${i}_${sub.id}`)?.value)||0);
+  },0);
+  const el = document.getElementById('schedTotal_'+i);
+  if(el) el.innerHTML = `合計 <span>${total.toFixed(1)}</span>h`;
+}
+
+function saveSchedule() {
+  const sched = {};
+  DAYS.forEach((_,i)=>{
+    const isRest = document.getElementById('restToggle_'+i)?.classList.contains('on');
+    const hours  = {};
+    SUBJECTS.forEach(sub=>{
+      hours[sub.id] = parseFloat(document.getElementById(`sinput_${i}_${sub.id}`)?.value)||0;
+    });
+    sched[i] = { rest:isRest, hours };
+  });
+  save('schedule', sched);
+  showToast('スケジュールを保存しました ✓');
+  renderDash();
+}
+
+// ============================================================
+// STATS PAGE
+// ============================================================
+function renderStats() {
+  const logs = getLogs();
+
+  // aggregate per subject
+  const totals = {};
+  SUBJECTS.forEach(sub=>{ totals[sub.id]=0; });
+  Object.values(logs).forEach(dayLog=>{
+    SUBJECTS.forEach(sub=>{
+      totals[sub.id] += parseFloat(dayLog[sub.id])||0;
+    });
+  });
+
+  const grandTotal = SUBJECTS.reduce((s,sub)=>s+totals[sub.id],0);
+  const maxH = Math.max(...SUBJECTS.map(sub=>totals[sub.id]), 1);
+
+  document.getElementById('sTotalH').textContent = grandTotal.toFixed(1);
+
+  document.getElementById('subjectBars').innerHTML = SUBJECTS.map(sub=>{
+    const h = totals[sub.id];
+    const pct = (h/maxH*100).toFixed(1);
+    return `<div class="subject-card">
+      <div class="subj-header">
+        <span class="subj-dot" style="background:${sub.color}"></span>
+        <span class="subj-name">${sub.name}</span>
+        <span class="subj-total" style="color:${sub.color}">${h.toFixed(1)}<span style="font-family:'Noto Sans JP';font-size:11px;color:var(--muted)">h</span></span>
+      </div>
+      <div class="subj-bar-wrap">
+        <div class="subj-bar-fill" style="width:${pct}%;background:${sub.color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // recent 7 days
+  const recentKeys = Object.keys(logs).sort().slice(-7).reverse();
+  if(recentKeys.length===0) {
+    document.getElementById('recentLog').innerHTML =
+      '<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">まだ記録がありません</div>';
+    return;
+  }
+  document.getElementById('recentLog').innerHTML = recentKeys.map(k=>{
+    const dl = logs[k];
+    const dayTotal = SUBJECTS.reduce((s,sub)=>s+(parseFloat(dl[sub.id])||0),0);
+    const d = new Date(k+'T12:00:00');
+    const dStr = d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+    return `<div class="ts-row">
+      <span style="font-size:12px;color:var(--muted);min-width:80px">${dStr}</span>
+      <span style="flex:1;font-size:13px">${dayTotal.toFixed(1)}h 学習</span>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// SETTINGS PAGE
+// ============================================================
+function renderSettings() {
+  document.getElementById('sExamDate').value = getExamDate();
+}
+
+function saveBasicSettings() {
+  const d = document.getElementById('sExamDate').value;
+  if(!d){ alert('試験日を入力してください'); return; }
+  localStorage.setItem('examDate', d);
+  showToast('設定を保存しました ✓');
+  renderDash();
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderDash();
+renderSched();
+</script>
+</body>
+</html>
