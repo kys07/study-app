@@ -251,12 +251,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="sync-dot" id="syncDot"></div>
         <span id="syncText">未設定</span>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.8">GitHub Personal Access Tokenを設定するとどのデバイスからでもデータが同期されます。</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.8">最初にトークンだけを保存し、その後に取得または送信を選びます。新しい端末では、先に「クラウドから取得」を押してください。</div>
       <div style="font-size:12px;color:var(--text);margin-bottom:4px">Personal Access Token</div>
       <input class="token-input" type="password" id="tokenInput" placeholder="ghp_...">
-      <button class="save-btn" onclick="saveToken()" style="margin-top:12px">トークンを保存して同期する</button>
-      <button class="secondary-btn" onclick="syncFromCloud()">クラウドからデータを取得する</button>
-      <button class="secondary-btn" onclick="syncToCloud()" style="margin-top:4px">クラウドへデータを送信する</button>
+      <button class="save-btn" onclick="saveToken()" style="margin-top:12px">トークンだけを保存する</button>
+      <button class="secondary-btn" onclick="syncFromCloud()">↓ クラウドからデータを取得する</button>
+      <button class="secondary-btn" onclick="syncToCloud(true)" style="margin-top:4px">↑ クラウドへデータを送信する</button>
     </div>
     <div class="hint">📱 iPhoneの場合：Safariで開き「共有」→「ホーム画面に追加」<br>でアプリのようにホーム画面から起動できます</div>
   </div>
@@ -304,13 +304,12 @@ function getGistId(){return FIXED_GIST_ID;}
 function todayKey(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
 
 // ===== GITHUB GIST SYNC =====
-async function saveToken(){
+function saveToken(){
   const token=document.getElementById('tokenInput').value.trim();
   if(!token){alert('トークンを入力してください');return;}
   localStorage.setItem('gh_token',token);
-  showToast('トークンを保存しました');
-  await syncToCloud();
-  updateSyncStatus();
+  setSyncStatus('', 'トークン設定済み（未取得）');
+  showToast('トークンだけを保存しました ✓');
 }
 
 function setSyncStatus(state, text){
@@ -325,9 +324,10 @@ function setSyncStatus(state, text){
   });
 }
 
-async function syncToCloud(){
+async function syncToCloud(askConfirmation=false){
   const token=getToken();
   if(!token){setSyncStatus('err','トークン未設定');return;}
+  if(askConfirmation && !confirm('この端末のデータでクラウド上のデータを上書きします。\n本当に送信しますか？')) return;
   setSyncStatus('loading','同期中...');
   const data={
     logs: getLogs(),
@@ -394,10 +394,8 @@ async function syncFromCloud(){
 
 function updateSyncStatus(){
   const token=getToken();
-  const gistId=getGistId();
   if(!token){setSyncStatus('','トークン未設定');}
-  else if(!gistId){setSyncStatus('','未同期');}
-  else {setSyncStatus('ok','同期済み');}
+  else {setSyncStatus('','トークン設定済み');}
 }
 
 // ===== NAV =====
