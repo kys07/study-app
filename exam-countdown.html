@@ -299,7 +299,8 @@ function getSchedule(){return load('schedule',DEFAULT_SCHEDULE);}
 function getExamDate(){return localStorage.getItem('examDate')||'';}
 function getLogs(){return load('logs',{});}
 function getToken(){return localStorage.getItem('gh_token')||'';}
-function getGistId(){return localStorage.getItem('gist_id')||'';}
+const FIXED_GIST_ID = '067a29b3bcd9bb50e7092a7039f8fc02';
+function getGistId(){return FIXED_GIST_ID;}
 function todayKey(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
 
 // ===== GITHUB GIST SYNC =====
@@ -353,7 +354,7 @@ async function syncToCloud(){
     }
     if(!res.ok) throw new Error(res.status);
     const json=await res.json();
-    localStorage.setItem('gist_id',json.id);
+    // Gist IDはアプリ内で固定しているため、localStorageには保存しません。
     const now=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
     setSyncStatus('ok',`同期済み ${now}`);
     showToast('クラウドに保存しました ✓');
