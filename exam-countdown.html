@@ -125,7 +125,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .task-context.next{color:var(--accent);}
 .task-item:last-child{border-bottom:none;}
 .task-main{display:flex;align-items:center;gap:8px;}
-.task-memo{width:calc(100% - 28px);margin:7px 0 0 28px;min-height:46px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.6;padding:8px 9px;outline:none;}
+.task-memo-actions{margin:7px 0 0 28px;}
+.task-memo-btn{background:transparent;border:none;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:10px;padding:3px 0;cursor:pointer;}
+.task-memo-btn.has-memo{color:var(--accent);}
+.task-memo{width:100%;margin-top:6px;min-height:46px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.6;padding:8px 9px;outline:none;}
 .task-memo:focus{border-color:var(--accent);}
 .task-check{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;}
 .task-text{flex:1;background:transparent;border:none;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;outline:none;min-width:0;}
@@ -567,6 +570,7 @@ async function saveSchedule(){
 
 // ===== SUBJECT PLANS =====
 const expandedTaskLists=new Set();
+const openTaskMemos=new Set();
 function clampPct(n){return Math.max(0,Math.min(100,Number.isFinite(n)?n:0));}
 function renderPlans(){
   const plans=getPlans();
@@ -646,7 +650,11 @@ function renderTasks(subjectId,tasks){
       <button class="task-order" onclick="moveTask('${subjectId}',${index},1)" ${index===tasks.length-1?'disabled':''}>↓</button>
       <button class="task-delete" onclick="deleteTask('${subjectId}',${index})">×</button>
     </div>
-    <textarea class="task-memo" placeholder="最後にやった日付、重要なワンポイントなど" onchange="editTaskMemo('${subjectId}',${index},this.value)">${escapeTextarea(task.memo||'')}</textarea>
+    <div class="task-memo-actions">
+      ${(task.memo||'').trim()||openTaskMemos.has(subjectId+':'+index)
+        ?`<textarea class="task-memo" placeholder="最後にやった日付、重要なワンポイントなど" onchange="editTaskMemo('${subjectId}',${index},this.value)">${escapeTextarea(task.memo||'')}</textarea>`
+        :`<button class="task-memo-btn" onclick="addTaskMemo('${subjectId}',${index})">＋ メモを追加</button>`}
+    </div>
   </div>`).join('')+'</div>';
 }
 function escapeHtml(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -688,6 +696,7 @@ function addTask(subjectId){
 }
 function editTask(subjectId,index,title){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].title=title;save('plans',plans);}
 function editTaskMemo(subjectId,index,memo){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].memo=memo;save('plans',plans);}
+function addTaskMemo(subjectId,index){openTaskMemos.add(subjectId+':'+index);const plans=collectPlansFromScreen();save('plans',plans);renderPlans();}
 function toggleTask(subjectId,index,done){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].done=done;save('plans',plans);renderPlans();}
 function moveTask(subjectId,index,dir){const plans=collectPlansFromScreen(),tasks=plans[subjectId].tasks,next=index+dir;if(next<0||next>=tasks.length)return;[tasks[index],tasks[next]]=[tasks[next],tasks[index]];save('plans',plans);renderPlans();}
 function deleteTask(subjectId,index){if(!confirm('このタスクを削除しますか？'))return;const plans=collectPlansFromScreen();plans[subjectId].tasks.splice(index,1);save('plans',plans);renderPlans();}
