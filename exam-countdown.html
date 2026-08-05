@@ -112,6 +112,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .plan-diff{margin-top:10px;font-size:11px;text-align:center;padding:7px;border-radius:8px;background:var(--surface);color:var(--muted);}
 .plan-diff.good{color:var(--green);}.plan-diff.warn{color:var(--warn);}.plan-diff.bad{color:var(--red);}
 .task-section{margin-top:13px;border-top:1px solid var(--border);padding-top:12px;}
+.task-list.collapsed .task-item:nth-child(n+4){display:none;}
+.task-toggle{width:100%;margin-top:8px;padding:8px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:11px;cursor:pointer;}
+.plan-notes{margin-top:12px;}
+.plan-notes-label{font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:.05em;}
+.plan-notes-input{width:100%;min-height:82px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;line-height:1.7;padding:10px;outline:none;}
+.plan-notes-input:focus{border-color:var(--accent);}
 .task-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
 .task-title{font-size:11px;color:var(--muted);}
 .task-add{border:1px solid var(--border);background:transparent;color:var(--accent);border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;}
@@ -196,9 +202,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
   <!-- DASHBOARD -->
   <div class="page active" id="page-dash">
-    <div id="restBanner" class="rest-banner" style="display:none">
-      <span class="big-emoji">☕</span>今日は休息日。<br>しっかり休んで明日に備えよう。
-    </div>
+
     <div class="card">
       <div class="sync-status" id="dashSyncStatus">
         <div class="sync-dot" id="dashSyncDot"></div>
@@ -210,14 +214,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </div>
       <div class="exam-label" id="dExamLabel">試験日を設定してください</div>
       <div class="stats-row">
-        <div class="stat-mini"><div class="lbl">残り勉強時間<br>（全日合計）</div><div class="val orange" id="dTotalH">–<small>h</small></div></div>
-        <div class="stat-mini"><div class="lbl">今日の<br>目標合計</div><div class="val" id="dTodayH">–<small>h</small></div></div>
+        <div class="stat-mini"><div class="lbl">最新の<br>残り時間見積もり</div><div class="val orange" id="dTotalH">–<small>h</small></div></div>
+        <div class="stat-mini"><div class="lbl">累積<br>実績時間</div><div class="val" id="dTodayH">–<small>h</small></div></div>
         <div class="stat-mini"><div class="lbl">残り週数</div><div class="val" id="dWeeks">–<small>週</small></div></div>
-        <div class="stat-mini"><div class="lbl">今週の<br>勉強日数</div><div class="val green" id="dStudyDays">–<small>日</small></div></div>
+        <div class="stat-mini"><div class="lbl">科目別<br>配分時間合計</div><div class="val green" id="dStudyDays">–<small>h</small></div></div>
       </div>
     </div>
     <div class="card">
-      <div class="card-title">今日のスケジュール</div>
+      <div class="card-title">科目別計画</div>
       <div id="todaySchedList"></div>
     </div>
   </div>
@@ -236,22 +240,11 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <!-- SCHEDULE -->
   <div class="page" id="page-sched">
     <div class="card">
-      <div class="card-title">スケジュール管理</div>
-      <div class="schedule-mode-tabs">
-        <button class="schedule-mode-tab active" id="scheduleModeWeeklyBtn" onclick="switchScheduleMode('weekly')">週間時間割</button>
-        <button class="schedule-mode-tab" id="scheduleModePlanBtn" onclick="switchScheduleMode('plan')">科目別計画</button>
-      </div>
-      <div class="schedule-mode-panel active" id="scheduleModeWeekly">
-        <div class="day-tabs" id="dayTabs"></div>
-        <div id="dayPanels"></div>
-        <button class="save-btn" onclick="saveSchedule()">スケジュールを保存する</button>
-      </div>
-      <div class="schedule-mode-panel" id="scheduleModePlan">
-        <div class="plan-summary" id="planSummary"></div>
-        <div class="plan-note">時間消化率＝実績時間÷配分時間。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
-        <div id="subjectPlans"></div>
-        <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
-      </div>
+      <div class="card-title">科目別計画</div>
+      <div class="plan-summary" id="planSummary"></div>
+      <div class="plan-note">時間消化率＝実績時間÷配分時間。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
+      <div id="subjectPlans"></div>
+      <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
     </div>
   </div>
 
@@ -352,7 +345,8 @@ function getPlans(){
     merged[sub.id]={
       allocatedHours:parseFloat(p.allocatedHours)||0,
       remainingEstimate:parseFloat(p.remainingEstimate)||0,
-      tasks:Array.isArray(p.tasks)?p.tasks:[]
+      tasks:Array.isArray(p.tasks)?p.tasks:[],
+      notes:typeof p.notes==='string'?p.notes:''
     };
   });
   return merged;
@@ -479,47 +473,42 @@ function goPage(id,btn){
   document.getElementById('scrollArea').scrollTop=0;
   if(id==='dash') renderDash();
   if(id==='log') renderLog();
-  if(id==='sched'){renderSched();renderPlans();}
+  if(id==='sched') renderPlans();
   if(id==='stats') renderStats();
   if(id==='settings') renderSettings();
 }
 
 // ===== DASHBOARD =====
 function renderDash(){
-  const examDate=getExamDate(),sched=getSchedule(),now=new Date();
-  const dow=now.getDay(),todaySched=sched[dow]||{rest:true,hours:{}};
-  document.getElementById('restBanner').style.display=todaySched.rest?'block':'none';
+  const examDate=getExamDate(),plans=getPlans(),now=new Date();
   updateSyncStatus();
+  let allocatedTotal=0,actualTotal=0,remainingTotal=0;
+  SUBJECTS.forEach(sub=>{
+    allocatedTotal+=plans[sub.id].allocatedHours||0;
+    actualTotal+=getSubjectActualHours(sub.id);
+    remainingTotal+=plans[sub.id].remainingEstimate||0;
+  });
   if(!examDate){
-    ['dDays','dTotalH','dTodayH','dWeeks','dStudyDays'].forEach(id=>document.getElementById(id).innerHTML='–');
+    document.getElementById('dDays').textContent='–';
+    document.getElementById('dWeeks').innerHTML='–';
     document.getElementById('dExamLabel').innerHTML='試験日を設定してください';
-    renderTodaySched(todaySched); return;
+  }else{
+    const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    const eDay=new Date(examDate+'T00:00:00');
+    const daysLeft=Math.max(0,Math.ceil((eDay-today)/86400000));
+    document.getElementById('dDays').textContent=daysLeft;
+    document.getElementById('dWeeks').innerHTML=`${Math.floor(daysLeft/7)}<small>週</small>`;
+    document.getElementById('dExamLabel').innerHTML=`試験日 <strong>${eDay.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})}</strong>`;
   }
-  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const eDay=new Date(new Date(examDate+'T00:00:00').toDateString());
-  const daysLeft=Math.max(0,Math.ceil((eDay-today)/86400000));
-  let totalHoursLeft=0;
-  let weekStudy=0;
-  for(let i=0;i<daysLeft;i++){
-    const d=new Date(today.getTime()+i*86400000);
-    const ds=sched[d.getDay()]||{rest:true,hours:{}};
-    if(!ds.rest) totalHoursLeft+=SUBJECTS.reduce((s,sub)=>s+(parseFloat(ds.hours[sub.id])||0),0);
-  }
-  for(let d=0;d<7;d++){if(!(sched[d]&&sched[d].rest)) weekStudy++;}
-  const todayTotal=todaySched.rest?0:SUBJECTS.reduce((s,sub)=>s+(parseFloat(todaySched.hours[sub.id])||0),0);
-  document.getElementById('dDays').textContent=daysLeft;
-  document.getElementById('dExamLabel').innerHTML=`試験日 <strong>${eDay.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})}</strong>`;
-  document.getElementById('dTotalH').innerHTML=`${Math.round(totalHoursLeft)}<small>h</small>`;
-  document.getElementById('dTodayH').innerHTML=`${todayTotal.toFixed(1)}<small>h</small>`;
-  document.getElementById('dWeeks').innerHTML=`${Math.floor(daysLeft/7)}<small>週</small>`;
-  document.getElementById('dStudyDays').innerHTML=`${weekStudy}<small>日</small>`;
-  renderTodaySched(todaySched);
-}
-
-function renderTodaySched(todaySched){
-  const el=document.getElementById('todaySchedList');
-  if(todaySched.rest){el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:12px 0">今日は休息日です</div>';return;}
-  el.innerHTML=SUBJECTS.map(sub=>{const h=parseFloat(todaySched.hours[sub.id])||0;return `<div class="ts-row"><span class="ts-dot" style="background:${sub.color}"></span><span class="ts-name">${sub.name}</span><span class="ts-planned">${h>0?h+'h':'–'}</span></div>`;}).join('');
+  document.getElementById('dTotalH').innerHTML=`${remainingTotal.toFixed(1)}<small>h</small>`;
+  document.getElementById('dTodayH').innerHTML=`${actualTotal.toFixed(1)}<small>h</small>`;
+  document.getElementById('dStudyDays').innerHTML=`${allocatedTotal.toFixed(1)}<small>h</small>`;
+  document.getElementById('todaySchedList').innerHTML=SUBJECTS.map(sub=>{
+    const p=plans[sub.id],actual=getSubjectActualHours(sub.id),forecast=actual+(p.remainingEstimate||0);
+    const rate=forecast>0?actual/forecast*100:0;
+    const next=(p.tasks||[]).find(t=>!t.done);
+    return `<div class="ts-row"><span class="ts-dot" style="background:${sub.color}"></span><span class="ts-name"><span style="display:block">${sub.name}</span><span style="display:block;font-size:10px;color:var(--muted);margin-top:2px">${next?'次：'+escapeHtml(next.title):'未完了タスクなし'}</span></span><span class="ts-planned">${rate.toFixed(1)}%</span></div>`;
+  }).join('');
 }
 
 // ===== LOG =====
@@ -551,17 +540,7 @@ async function saveLog(){
 
 // ===== SCHEDULE =====
 let activeDayTab=0;
-function renderSched(){
-  const sched=getSchedule();
-  document.getElementById('dayTabs').innerHTML=DAYS.map((d,i)=>{const isRest=sched[i]&&sched[i].rest;return `<button class="day-tab${isRest?' rest':''}${i===activeDayTab?' active':''}" onclick="switchDayTab(${i})">${d}</button>`;}).join('');
-  document.getElementById('dayPanels').innerHTML=DAYS.map((_,i)=>{
-    const ds=sched[i]||{rest:false,hours:{}};
-    const totalH=SUBJECTS.reduce((s,sub)=>s+(parseFloat(ds.hours[sub.id])||0),0);
-    return `<div class="schedule-panel${i===activeDayTab?' active':''}" id="spanel_${i}"><div class="rest-toggle-row"><span class="rest-toggle-label">休息日にする</span><div class="toggle${ds.rest?' on':''}" id="restToggle_${i}" onclick="toggleRest(${i})"><div class="toggle-thumb"></div></div></div><div id="schedInputs_${i}" style="${ds.rest?'opacity:0.3;pointer-events:none':''}">
-      ${SUBJECTS.map(sub=>{const h=ds.hours[sub.id]!==undefined?ds.hours[sub.id]:'';return `<div class="sched-row"><span class="sched-dot" style="background:${sub.color}"></span><span class="sched-name">${sub.name}</span><input class="sched-input" type="number" step="0.5" min="0" max="24" id="sinput_${i}_${sub.id}" value="${h}" placeholder="0" oninput="updateSchedTotal(${i})"><span class="sched-unit">h</span></div>`;}).join('')}
-      <div class="sched-total" id="schedTotal_${i}">合計 <span>${totalH.toFixed(1)}</span>h</div></div></div>`;
-  }).join('');
-}
+function renderSched(){renderPlans();}
 
 function switchDayTab(i){activeDayTab=i;document.querySelectorAll('.day-tab').forEach((t,idx)=>t.classList.toggle('active',idx===i));document.querySelectorAll('.schedule-panel').forEach((p,idx)=>p.classList.toggle('active',idx===i));}
 function toggleRest(i){const toggle=document.getElementById('restToggle_'+i),inputs=document.getElementById('schedInputs_'+i);const isOn=toggle.classList.toggle('on');inputs.style.opacity=isOn?'0.3':'1';inputs.style.pointerEvents=isOn?'none':'auto';document.querySelectorAll('.day-tab')[i].classList.toggle('rest',isOn);}
@@ -578,15 +557,7 @@ async function saveSchedule(){
 
 
 // ===== SUBJECT PLANS =====
-let activeScheduleMode='weekly';
-function switchScheduleMode(mode){
-  activeScheduleMode=mode;
-  document.getElementById('scheduleModeWeekly').classList.toggle('active',mode==='weekly');
-  document.getElementById('scheduleModePlan').classList.toggle('active',mode==='plan');
-  document.getElementById('scheduleModeWeeklyBtn').classList.toggle('active',mode==='weekly');
-  document.getElementById('scheduleModePlanBtn').classList.toggle('active',mode==='plan');
-  if(mode==='plan') renderPlans();
-}
+const expandedTaskLists=new Set();
 function clampPct(n){return Math.max(0,Math.min(100,Number.isFinite(n)?n:0));}
 function renderPlans(){
   const plans=getPlans();
@@ -629,26 +600,30 @@ function renderSubjectPlan(sub,plan){
       <div class="plan-bar-row"><span>進捗見積率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="progressBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><span id="progressRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
     </div>
     <div class="plan-diff ${diffClass}" id="diff_${sub.id}">差異 ${diff>=0?'+':''}${diff.toFixed(1)}pt｜${diffText}</div>
-    <div class="task-section"><div class="task-title-row"><span class="task-title">やることリスト（上から実施）</span><button class="task-add" onclick="addTask('${sub.id}')">＋追加</button></div><div id="tasks_${sub.id}">${renderTasks(sub.id,tasks)}</div></div>
+    <div class="task-section"><div class="task-title-row"><span class="task-title">やることリスト（上から実施）</span><button class="task-add" onclick="addTask('${sub.id}')">＋追加</button></div><div id="tasks_${sub.id}">${renderTasks(sub.id,tasks)}</div>${tasks.length>3?`<button class="task-toggle" id="taskToggle_${sub.id}" onclick="toggleTaskList('${sub.id}')">${expandedTaskLists.has(sub.id)?'折りたたむ':`すべて表示（${tasks.length}件）`}</button>`:''}</div>
+    <div class="plan-notes"><div class="plan-notes-label">備考</div><textarea class="plan-notes-input" id="notes_${sub.id}" placeholder="最後に学習した日付、重要なワンポイントなど" onchange="savePlanNote('${sub.id}',this.value)">${escapeTextarea(plan.notes||'')}</textarea></div>
   </div>`;
 }
 function renderTasks(subjectId,tasks){
   if(!tasks.length) return '<div style="font-size:11px;color:var(--muted);padding:6px 0">まだタスクがありません</div>';
-  return tasks.map((task,i)=>`<div class="task-item">
+  const collapsed=!expandedTaskLists.has(subjectId);
+  return `<div class="task-list ${collapsed?'collapsed':''}">`+tasks.map((task,i)=>`<div class="task-item">
     <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${i},this.checked)">
     <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${i},this.value)">
     <button class="task-order" onclick="moveTask('${subjectId}',${i},-1)" ${i===0?'disabled':''}>↑</button>
     <button class="task-order" onclick="moveTask('${subjectId}',${i},1)" ${i===tasks.length-1?'disabled':''}>↓</button>
     <button class="task-delete" onclick="deleteTask('${subjectId}',${i})">×</button>
-  </div>`).join('');
+  </div>`).join('')+'</div>';
 }
 function escapeHtml(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeTextarea(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function collectPlansFromScreen(){
   const plans=getPlans();
   SUBJECTS.forEach(sub=>{
     const a=document.getElementById('allocated_'+sub.id),r=document.getElementById('remaining_'+sub.id);
     if(a) plans[sub.id].allocatedHours=parseFloat(a.value)||0;
     if(r) plans[sub.id].remainingEstimate=parseFloat(r.value)||0;
+    const n=document.getElementById('notes_'+sub.id);if(n) plans[sub.id].notes=n.value;
   });
   return plans;
 }
@@ -666,6 +641,11 @@ function updatePlanPreview(subjectId){
   if(diff<=-5){cls='bad';text='進捗が時間消化より遅れています';}else if(diff>=5){cls='good';text='進捗が時間消化より先行しています';}
   el.className='plan-diff '+cls;el.textContent=`差異 ${diff>=0?'+':''}${diff.toFixed(1)}pt｜${text}`;
 }
+function toggleTaskList(subjectId){
+  if(expandedTaskLists.has(subjectId)) expandedTaskLists.delete(subjectId); else expandedTaskLists.add(subjectId);
+  const plans=collectPlansFromScreen();save('plans',plans);renderPlans();
+}
+function savePlanNote(subjectId,value){const plans=collectPlansFromScreen();plans[subjectId].notes=value;save('plans',plans);}
 function addTask(subjectId){
   const title=prompt('やることを入力してください');if(!title||!title.trim())return;
   const plans=collectPlansFromScreen();plans[subjectId].tasks.push({id:'task_'+Date.now(),title:title.trim(),done:false});save('plans',plans);renderPlans();
@@ -777,7 +757,7 @@ async function saveBasicSettings(){
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 
 // ===== INIT =====
-renderDash(); renderSched(); renderPlans(); updateSyncStatus();
+renderDash(); renderPlans(); updateSyncStatus();
 </script>
 </body>
 </html>
