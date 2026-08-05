@@ -107,8 +107,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .plan-metric small{font-family:'Noto Sans JP',sans-serif;font-size:9px;color:var(--muted);margin-left:3px;}
 .plan-bars{margin-top:12px;}
 .plan-bar-row{display:grid;grid-template-columns:63px 1fr 42px;align-items:center;gap:8px;margin-top:7px;font-size:10px;color:var(--muted);}
-.plan-bar-wrap{height:7px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;}
-.plan-bar-fill{height:100%;border-radius:4px;transition:width .3s;}
+.plan-bar-wrap{height:18px;background:rgba(255,255,255,0.06);border-radius:9px;overflow:hidden;}
+.plan-bar-fill{height:100%;border-radius:9px;transition:width .3s;}
 .plan-diff{margin-top:10px;font-size:11px;text-align:center;padding:7px;border-radius:8px;background:var(--surface);color:var(--muted);}
 .plan-diff.good{color:var(--green);}.plan-diff.warn{color:var(--warn);}.plan-diff.bad{color:var(--red);}
 .task-section{margin-top:13px;border-top:1px solid var(--border);padding-top:12px;}
@@ -221,10 +221,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </div>
       <div class="exam-label" id="dExamLabel">試験日を設定してください</div>
       <div class="stats-row">
-        <div class="stat-mini"><div class="lbl">最新の<br>残り時間見積もり</div><div class="val orange" id="dTotalH">–<small>h</small></div></div>
+        <div class="stat-mini"><div class="lbl">全科目の<br>進捗度</div><div class="val orange" id="dTotalH">–<small>h</small></div></div>
         <div class="stat-mini"><div class="lbl">累積<br>実績時間</div><div class="val" id="dTodayH">–<small>h</small></div></div>
         <div class="stat-mini"><div class="lbl">残り週数</div><div class="val" id="dWeeks">–<small>週</small></div></div>
-        <div class="stat-mini"><div class="lbl">科目別<br>投下可能時間合計</div><div class="val green" id="dStudyDays">–<small>h</small></div></div>
+        <div class="stat-mini"><div class="lbl">投下可能<br>時間合計</div><div class="val green" id="dStudyDays">–<small>h</small></div></div>
       </div>
     </div>
     <div class="card">
@@ -249,7 +249,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="card">
       <div class="card-title">科目別計画</div>
       <div class="plan-summary" id="planSummary"></div>
-      <div class="plan-note">時間消化率＝実績時間÷投下可能時間。残り時間が未入力の場合は「投下可能時間－実績時間」を自動使用します。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
+      <div class="plan-note">達成率・進捗率＝累積実績時間÷投下可能時間です。やることリストは、学習順序と完了状況の確認に使用します。</div>
       <div id="subjectPlans"></div>
       <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
     </div>
@@ -494,11 +494,10 @@ function goPage(id,btn){
 function renderDash(){
   const examDate=getExamDate(),plans=getPlans(),now=new Date();
   updateSyncStatus();
-  let allocatedTotal=0,actualTotal=0,remainingTotal=0;
+  let allocatedTotal=0,actualTotal=0;
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours||0;
     actualTotal+=getSubjectActualHours(sub.id);
-    remainingTotal+=getEffectiveRemaining(plans[sub.id],getSubjectActualHours(sub.id));
   });
   if(!examDate){
     document.getElementById('dDays').textContent='–';
@@ -512,12 +511,13 @@ function renderDash(){
     document.getElementById('dWeeks').innerHTML=`${Math.floor(daysLeft/7)}<small>週</small>`;
     document.getElementById('dExamLabel').innerHTML=`試験日 <strong>${eDay.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})}</strong>`;
   }
-  document.getElementById('dTotalH').innerHTML=`${remainingTotal.toFixed(1)}<small>h</small>`;
+  const overallRate=allocatedTotal>0?actualTotal/allocatedTotal*100:0;
+  document.getElementById('dTotalH').innerHTML=`${overallRate.toFixed(1)}<small>%</small>`;
   document.getElementById('dTodayH').innerHTML=`${actualTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('dStudyDays').innerHTML=`${allocatedTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('todaySchedList').innerHTML=SUBJECTS.map(sub=>{
-    const p=plans[sub.id],actual=getSubjectActualHours(sub.id),forecast=actual+getEffectiveRemaining(p,actual);
-    const rate=forecast>0?actual/forecast*100:0;
+    const p=plans[sub.id],actual=getSubjectActualHours(sub.id),allocated=p.allocatedHours||0;
+    const rate=allocated>0?actual/allocated*100:0;
     const next=(p.tasks||[]).find(t=>!t.done);
     return `<div class="ts-row"><span class="ts-dot" style="background:${sub.color}"></span><span class="ts-name"><span style="display:block">${sub.name}</span><span style="display:block;font-size:10px;color:var(--muted);margin-top:2px">${next?'次：'+escapeHtml(next.title):'未完了タスクなし'}</span></span><span class="ts-planned">${rate.toFixed(1)}%</span></div>`;
   }).join('');
@@ -574,46 +574,33 @@ const openTaskMemos=new Set();
 function clampPct(n){return Math.max(0,Math.min(100,Number.isFinite(n)?n:0));}
 function renderPlans(){
   const plans=getPlans();
-  let allocatedTotal=0,actualTotal=0,remainingTotal=0;
+  let allocatedTotal=0,actualTotal=0;
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours;
     actualTotal+=getSubjectActualHours(sub.id);
-    remainingTotal+=getEffectiveRemaining(plans[sub.id],getSubjectActualHours(sub.id));
   });
-  const totalForecast=actualTotal+remainingTotal;
+  const overallRate=allocatedTotal>0?actualTotal/allocatedTotal*100:0;
   document.getElementById('planSummary').innerHTML=`
     <div class="plan-summary-item"><div class="lbl">全科目の投下可能時間</div><div class="val">${allocatedTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
     <div class="plan-summary-item"><div class="lbl">累積実績時間</div><div class="val">${actualTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
-    <div class="plan-summary-item"><div class="lbl">最新の残り見積もり</div><div class="val">${remainingTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
-    <div class="plan-summary-item"><div class="lbl">最新の完了予測時間</div><div class="val">${totalForecast.toFixed(1)}<span style="font-size:11px">h</span></div></div>`;
+    <div class="plan-summary-item"><div class="lbl">全体の進捗率</div><div class="val">${overallRate.toFixed(1)}<span style="font-size:11px">%</span></div></div>`;
   document.getElementById('subjectPlans').innerHTML=SUBJECTS.map(sub=>renderSubjectPlan(sub,plans[sub.id])).join('');
 }
 function renderSubjectPlan(sub,plan){
   const actual=getSubjectActualHours(sub.id);
-  const allocated=plan.allocatedHours||0,remaining=getEffectiveRemaining(plan,actual);
-  const remainingInput=plan.remainingEstimate===null||plan.remainingEstimate===undefined?'':plan.remainingEstimate;
-  const forecast=actual+remaining;
-  const timeRate=allocated>0?actual/allocated*100:0;
-  const progressRate=forecast>0?actual/forecast*100:0;
-  const diff=progressRate-timeRate;
-  let diffClass='good',diffText='計画とほぼ同じ';
-  if(diff<=-5){diffClass='bad';diffText='進捗が時間消化より遅れています';}
-  else if(diff>=5){diffClass='good';diffText='進捗が時間消化より先行しています';}
-  else diffClass='warn';
+  const allocated=plan.allocatedHours||0;
+  const progressRate=allocated>0?actual/allocated*100:0;
   const tasks=plan.tasks||[];
   return `<div class="plan-subject" id="plan_${sub.id}">
     <div class="plan-subject-head"><span class="subj-dot" style="background:${sub.color}"></span><span class="plan-subject-name">${sub.name}</span></div>
     <div class="plan-grid">
       <div class="plan-field"><div class="plan-field-label">投下可能時間</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="allocated_${sub.id}" value="${allocated}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
       <div class="plan-field"><div class="plan-field-label">累積実績（自動）</div><div class="plan-metric" id="actual_${sub.id}">${actual.toFixed(1)}<small>h</small></div></div>
-      <div class="plan-field"><div class="plan-field-label">最新の残り時間見積もり</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="remaining_${sub.id}" value="${remainingInput}" placeholder="${Math.max(allocated-actual,0).toFixed(1)}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
-      <div class="plan-field"><div class="plan-field-label">最新の完了予測</div><div class="plan-metric" id="forecast_${sub.id}">${forecast.toFixed(1)}<small>h</small></div></div>
     </div>
     <div class="plan-bars">
-      <div class="plan-bar-row"><span>時間消化率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="timeBar_${sub.id}" style="width:${clampPct(timeRate)}%;background:${sub.color}"></div></div><span id="timeRate_${sub.id}">${timeRate.toFixed(1)}%</span></div>
-      <div class="plan-bar-row"><span>進捗見積率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="progressBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><span id="progressRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
+      <div class="plan-bar-row"><span>達成率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="achievementBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:${sub.color}"></div></div><span id="achievementRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
+      <div class="plan-bar-row"><span>進捗率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="progressBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:${sub.color}"></div></div><span id="progressRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
     </div>
-    <div class="plan-diff ${diffClass}" id="diff_${sub.id}">差異 ${diff>=0?'+':''}${diff.toFixed(1)}pt｜${diffText}</div>
     <div class="task-section"><div class="task-title-row"><span class="task-title">やることリスト（上から実施）</span><button class="task-add" onclick="addTask('${sub.id}')">＋追加</button></div><div id="tasks_${sub.id}">${renderTasks(sub.id,tasks)}</div>${tasks.length>3?`<button class="task-toggle" id="taskToggle_${sub.id}" onclick="toggleTaskList('${sub.id}')">${expandedTaskLists.has(sub.id)?'折りたたむ':`すべて表示（${tasks.length}件）`}</button>`:''}</div>
   </div>`;
 }
@@ -662,28 +649,19 @@ function escapeTextarea(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'
 function collectPlansFromScreen(){
   const plans=getPlans();
   SUBJECTS.forEach(sub=>{
-    const a=document.getElementById('allocated_'+sub.id),r=document.getElementById('remaining_'+sub.id);
+    const a=document.getElementById('allocated_'+sub.id);
     if(a) plans[sub.id].allocatedHours=parseFloat(a.value)||0;
-    if(r) plans[sub.id].remainingEstimate=r.value.trim()===''?null:Math.max(parseFloat(r.value)||0,0);
-    const n=document.getElementById('notes_'+sub.id);if(n) plans[sub.id].notes=n.value;
   });
   return plans;
 }
 function updatePlanPreview(subjectId){
   const actual=getSubjectActualHours(subjectId);
   const allocated=parseFloat(document.getElementById('allocated_'+subjectId)?.value)||0;
-  const remainingEl=document.getElementById('remaining_'+subjectId);
-  const remaining=remainingEl&&remainingEl.value.trim()!==''?Math.max(parseFloat(remainingEl.value)||0,0):Math.max(allocated-actual,0);
-  if(remainingEl) remainingEl.placeholder=Math.max(allocated-actual,0).toFixed(1);
-  const forecast=actual+remaining,timeRate=allocated>0?actual/allocated*100:0,progressRate=forecast>0?actual/forecast*100:0,diff=progressRate-timeRate;
-  document.getElementById('forecast_'+subjectId).innerHTML=`${forecast.toFixed(1)}<small>h</small>`;
-  document.getElementById('timeRate_'+subjectId).textContent=timeRate.toFixed(1)+'%';
+  const progressRate=allocated>0?actual/allocated*100:0;
+  document.getElementById('achievementRate_'+subjectId).textContent=progressRate.toFixed(1)+'%';
+  document.getElementById('achievementBar_'+subjectId).style.width=clampPct(progressRate)+'%';
   document.getElementById('progressRate_'+subjectId).textContent=progressRate.toFixed(1)+'%';
-  document.getElementById('timeBar_'+subjectId).style.width=clampPct(timeRate)+'%';
   document.getElementById('progressBar_'+subjectId).style.width=clampPct(progressRate)+'%';
-  const el=document.getElementById('diff_'+subjectId);let cls='warn',text='計画とほぼ同じ';
-  if(diff<=-5){cls='bad';text='進捗が時間消化より遅れています';}else if(diff>=5){cls='good';text='進捗が時間消化より先行しています';}
-  el.className='plan-diff '+cls;el.textContent=`差異 ${diff>=0?'+':''}${diff.toFixed(1)}pt｜${text}`;
 }
 function toggleTaskList(subjectId){
   if(expandedTaskLists.has(subjectId)) expandedTaskLists.delete(subjectId); else expandedTaskLists.add(subjectId);
