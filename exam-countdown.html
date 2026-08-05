@@ -121,8 +121,11 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .task-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
 .task-title{font-size:11px;color:var(--muted);}
 .task-add{border:1px solid var(--border);background:transparent;color:var(--accent);border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;}
-.task-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
+.task-item{padding:9px 0;border-bottom:1px solid var(--border);}
 .task-item:last-child{border-bottom:none;}
+.task-main{display:flex;align-items:center;gap:8px;}
+.task-memo{width:calc(100% - 28px);margin:7px 0 0 28px;min-height:46px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.6;padding:8px 9px;outline:none;}
+.task-memo:focus{border-color:var(--accent);}
 .task-check{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;}
 .task-text{flex:1;background:transparent;border:none;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;outline:none;min-width:0;}
 .task-text.done{text-decoration:line-through;color:var(--muted);}
@@ -217,7 +220,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="stat-mini"><div class="lbl">最新の<br>残り時間見積もり</div><div class="val orange" id="dTotalH">–<small>h</small></div></div>
         <div class="stat-mini"><div class="lbl">累積<br>実績時間</div><div class="val" id="dTodayH">–<small>h</small></div></div>
         <div class="stat-mini"><div class="lbl">残り週数</div><div class="val" id="dWeeks">–<small>週</small></div></div>
-        <div class="stat-mini"><div class="lbl">科目別<br>配分時間合計</div><div class="val green" id="dStudyDays">–<small>h</small></div></div>
+        <div class="stat-mini"><div class="lbl">科目別<br>投下可能時間合計</div><div class="val green" id="dStudyDays">–<small>h</small></div></div>
       </div>
     </div>
     <div class="card">
@@ -242,7 +245,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="card">
       <div class="card-title">科目別計画</div>
       <div class="plan-summary" id="planSummary"></div>
-      <div class="plan-note">時間消化率＝実績時間÷配分時間。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
+      <div class="plan-note">時間消化率＝実績時間÷投下可能時間。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
       <div id="subjectPlans"></div>
       <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
     </div>
@@ -345,7 +348,7 @@ function getPlans(){
     merged[sub.id]={
       allocatedHours:parseFloat(p.allocatedHours)||0,
       remainingEstimate:parseFloat(p.remainingEstimate)||0,
-      tasks:Array.isArray(p.tasks)?p.tasks:[],
+      tasks:Array.isArray(p.tasks)?p.tasks.map(t=>({...t,memo:typeof t?.memo==='string'?t.memo:''})):[],
       notes:typeof p.notes==='string'?p.notes:''
     };
   });
@@ -569,7 +572,7 @@ function renderPlans(){
   });
   const totalForecast=actualTotal+remainingTotal;
   document.getElementById('planSummary').innerHTML=`
-    <div class="plan-summary-item"><div class="lbl">全科目の配分時間</div><div class="val">${allocatedTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
+    <div class="plan-summary-item"><div class="lbl">全科目の投下可能時間</div><div class="val">${allocatedTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
     <div class="plan-summary-item"><div class="lbl">累積実績時間</div><div class="val">${actualTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
     <div class="plan-summary-item"><div class="lbl">最新の残り見積もり</div><div class="val">${remainingTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
     <div class="plan-summary-item"><div class="lbl">最新の完了予測時間</div><div class="val">${totalForecast.toFixed(1)}<span style="font-size:11px">h</span></div></div>`;
@@ -590,7 +593,7 @@ function renderSubjectPlan(sub,plan){
   return `<div class="plan-subject" id="plan_${sub.id}">
     <div class="plan-subject-head"><span class="subj-dot" style="background:${sub.color}"></span><span class="plan-subject-name">${sub.name}</span></div>
     <div class="plan-grid">
-      <div class="plan-field"><div class="plan-field-label">科目への配分時間</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="allocated_${sub.id}" value="${allocated}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
+      <div class="plan-field"><div class="plan-field-label">投下可能時間</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="allocated_${sub.id}" value="${allocated}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
       <div class="plan-field"><div class="plan-field-label">累積実績（自動）</div><div class="plan-metric" id="actual_${sub.id}">${actual.toFixed(1)}<small>h</small></div></div>
       <div class="plan-field"><div class="plan-field-label">最新の残り時間見積もり</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="remaining_${sub.id}" value="${remaining}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
       <div class="plan-field"><div class="plan-field-label">最新の完了予測</div><div class="plan-metric" id="forecast_${sub.id}">${forecast.toFixed(1)}<small>h</small></div></div>
@@ -601,18 +604,20 @@ function renderSubjectPlan(sub,plan){
     </div>
     <div class="plan-diff ${diffClass}" id="diff_${sub.id}">差異 ${diff>=0?'+':''}${diff.toFixed(1)}pt｜${diffText}</div>
     <div class="task-section"><div class="task-title-row"><span class="task-title">やることリスト（上から実施）</span><button class="task-add" onclick="addTask('${sub.id}')">＋追加</button></div><div id="tasks_${sub.id}">${renderTasks(sub.id,tasks)}</div>${tasks.length>3?`<button class="task-toggle" id="taskToggle_${sub.id}" onclick="toggleTaskList('${sub.id}')">${expandedTaskLists.has(sub.id)?'折りたたむ':`すべて表示（${tasks.length}件）`}</button>`:''}</div>
-    <div class="plan-notes"><div class="plan-notes-label">備考</div><textarea class="plan-notes-input" id="notes_${sub.id}" placeholder="最後に学習した日付、重要なワンポイントなど" onchange="savePlanNote('${sub.id}',this.value)">${escapeTextarea(plan.notes||'')}</textarea></div>
   </div>`;
 }
 function renderTasks(subjectId,tasks){
   if(!tasks.length) return '<div style="font-size:11px;color:var(--muted);padding:6px 0">まだタスクがありません</div>';
   const collapsed=!expandedTaskLists.has(subjectId);
   return `<div class="task-list ${collapsed?'collapsed':''}">`+tasks.map((task,i)=>`<div class="task-item">
-    <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${i},this.checked)">
-    <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${i},this.value)">
-    <button class="task-order" onclick="moveTask('${subjectId}',${i},-1)" ${i===0?'disabled':''}>↑</button>
-    <button class="task-order" onclick="moveTask('${subjectId}',${i},1)" ${i===tasks.length-1?'disabled':''}>↓</button>
-    <button class="task-delete" onclick="deleteTask('${subjectId}',${i})">×</button>
+    <div class="task-main">
+      <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${i},this.checked)">
+      <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${i},this.value)">
+      <button class="task-order" onclick="moveTask('${subjectId}',${i},-1)" ${i===0?'disabled':''}>↑</button>
+      <button class="task-order" onclick="moveTask('${subjectId}',${i},1)" ${i===tasks.length-1?'disabled':''}>↓</button>
+      <button class="task-delete" onclick="deleteTask('${subjectId}',${i})">×</button>
+    </div>
+    <textarea class="task-memo" placeholder="最後にやった日付、重要なワンポイントなど" onchange="editTaskMemo('${subjectId}',${i},this.value)">${escapeTextarea(task.memo||'')}</textarea>
   </div>`).join('')+'</div>';
 }
 function escapeHtml(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -648,9 +653,10 @@ function toggleTaskList(subjectId){
 function savePlanNote(subjectId,value){const plans=collectPlansFromScreen();plans[subjectId].notes=value;save('plans',plans);}
 function addTask(subjectId){
   const title=prompt('やることを入力してください');if(!title||!title.trim())return;
-  const plans=collectPlansFromScreen();plans[subjectId].tasks.push({id:'task_'+Date.now(),title:title.trim(),done:false});save('plans',plans);renderPlans();
+  const plans=collectPlansFromScreen();plans[subjectId].tasks.push({id:'task_'+Date.now(),title:title.trim(),done:false,memo:''});save('plans',plans);renderPlans();
 }
 function editTask(subjectId,index,title){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].title=title;save('plans',plans);}
+function editTaskMemo(subjectId,index,memo){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].memo=memo;save('plans',plans);}
 function toggleTask(subjectId,index,done){const plans=collectPlansFromScreen();if(plans[subjectId].tasks[index])plans[subjectId].tasks[index].done=done;save('plans',plans);renderPlans();}
 function moveTask(subjectId,index,dir){const plans=collectPlansFromScreen(),tasks=plans[subjectId].tasks,next=index+dir;if(next<0||next>=tasks.length)return;[tasks[index],tasks[next]]=[tasks[next],tasks[index]];save('plans',plans);renderPlans();}
 function deleteTask(subjectId,index){if(!confirm('このタスクを削除しますか？'))return;const plans=collectPlansFromScreen();plans[subjectId].tasks.splice(index,1);save('plans',plans);renderPlans();}
