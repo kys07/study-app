@@ -112,7 +112,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .plan-diff{margin-top:10px;font-size:11px;text-align:center;padding:7px;border-radius:8px;background:var(--surface);color:var(--muted);}
 .plan-diff.good{color:var(--green);}.plan-diff.warn{color:var(--warn);}.plan-diff.bad{color:var(--red);}
 .task-section{margin-top:13px;border-top:1px solid var(--border);padding-top:12px;}
-.task-list.collapsed .task-item:nth-child(n+4){display:none;}
 .task-toggle{width:100%;margin-top:8px;padding:8px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:11px;cursor:pointer;}
 .plan-notes{margin-top:12px;}
 .plan-notes-label{font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:.05em;}
@@ -122,13 +121,15 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .task-title{font-size:11px;color:var(--muted);}
 .task-add{border:1px solid var(--border);background:transparent;color:var(--accent);border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;}
 .task-item{padding:9px 0;border-bottom:1px solid var(--border);}
+.task-context{display:inline-block;margin:0 0 6px 28px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);font-size:9px;letter-spacing:.04em;}
+.task-context.next{color:var(--accent);}
 .task-item:last-child{border-bottom:none;}
 .task-main{display:flex;align-items:center;gap:8px;}
 .task-memo{width:calc(100% - 28px);margin:7px 0 0 28px;min-height:46px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.6;padding:8px 9px;outline:none;}
 .task-memo:focus{border-color:var(--accent);}
 .task-check{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;}
 .task-text{flex:1;background:transparent;border:none;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;outline:none;min-width:0;}
-.task-text.done{text-decoration:line-through;color:var(--muted);}
+.task-text.done{text-decoration:none;color:var(--green);font-weight:700;}
 .task-order,.task-delete{background:none;border:none;color:var(--muted);font-size:14px;padding:3px;cursor:pointer;}
 .task-delete{color:var(--red);}
 .plan-note{font-size:10px;color:var(--muted);line-height:1.8;margin:10px 2px 14px;}
@@ -608,16 +609,38 @@ function renderSubjectPlan(sub,plan){
 }
 function renderTasks(subjectId,tasks){
   if(!tasks.length) return '<div style="font-size:11px;color:var(--muted);padding:6px 0">まだタスクがありません</div>';
-  const collapsed=!expandedTaskLists.has(subjectId);
-  return `<div class="task-list ${collapsed?'collapsed':''}">`+tasks.map((task,i)=>`<div class="task-item">
+  const expanded=expandedTaskLists.has(subjectId);
+  let rows;
+  if(expanded){
+    rows=tasks.map((task,index)=>({task,index,context:''}));
+  }else{
+    const lastDoneIndex=tasks.reduce((last,task,index)=>task.done?index:last,-1);
+    const selected=[];
+    if(lastDoneIndex>=0) selected.push({task:tasks[lastDoneIndex],index:lastDoneIndex,context:'前回完了'});
+    const afterStart=lastDoneIndex>=0?lastDoneIndex+1:0;
+    const nextAfter=[];
+    for(let i=afterStart;i<tasks.length&&nextAfter.length<2;i++){
+      if(!tasks[i].done) nextAfter.push({task:tasks[i],index:i,context:'次にやる'});
+    }
+    if(nextAfter.length<2){
+      for(let i=0;i<afterStart&&nextAfter.length<2;i++){
+        if(!tasks[i].done&&!nextAfter.some(x=>x.index===i)) nextAfter.push({task:tasks[i],index:i,context:'次にやる'});
+      }
+    }
+    selected.push(...nextAfter);
+    if(selected.length===0) selected.push(...tasks.slice(-3).map((task,i)=>({task,index:tasks.length-Math.min(3,tasks.length)+i,context:'完了'})));
+    rows=selected;
+  }
+  return `<div class="task-list">`+rows.map(({task,index,context})=>`<div class="task-item">
+    ${context?`<span class="task-context ${context==='次にやる'?'next':''}">${context}</span>`:''}
     <div class="task-main">
-      <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${i},this.checked)">
-      <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${i},this.value)">
-      <button class="task-order" onclick="moveTask('${subjectId}',${i},-1)" ${i===0?'disabled':''}>↑</button>
-      <button class="task-order" onclick="moveTask('${subjectId}',${i},1)" ${i===tasks.length-1?'disabled':''}>↓</button>
-      <button class="task-delete" onclick="deleteTask('${subjectId}',${i})">×</button>
+      <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${index},this.checked)">
+      <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${index},this.value)">
+      <button class="task-order" onclick="moveTask('${subjectId}',${index},-1)" ${index===0?'disabled':''}>↑</button>
+      <button class="task-order" onclick="moveTask('${subjectId}',${index},1)" ${index===tasks.length-1?'disabled':''}>↓</button>
+      <button class="task-delete" onclick="deleteTask('${subjectId}',${index})">×</button>
     </div>
-    <textarea class="task-memo" placeholder="最後にやった日付、重要なワンポイントなど" onchange="editTaskMemo('${subjectId}',${i},this.value)">${escapeTextarea(task.memo||'')}</textarea>
+    <textarea class="task-memo" placeholder="最後にやった日付、重要なワンポイントなど" onchange="editTaskMemo('${subjectId}',${index},this.value)">${escapeTextarea(task.memo||'')}</textarea>
   </div>`).join('')+'</div>';
 }
 function escapeHtml(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
