@@ -121,11 +121,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .task-title{font-size:11px;color:var(--muted);}
 .task-add{border:1px solid var(--border);background:transparent;color:var(--accent);border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;}
 .task-item{padding:9px 0;border-bottom:1px solid var(--border);}
-.task-context{display:inline-block;margin:0 0 6px 28px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);font-size:9px;letter-spacing:.04em;}
+.task-context{display:inline-block;margin:0 0 6px 58px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);font-size:9px;letter-spacing:.04em;}
 .task-context.next{color:var(--accent);}
 .task-item:last-child{border-bottom:none;}
 .task-main{display:flex;align-items:center;gap:8px;}
-.task-memo-actions{margin:7px 0 0 28px;}
+.task-number{width:24px;flex-shrink:0;text-align:right;font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:var(--muted);letter-spacing:.04em;}
+.task-number.done{color:var(--green);}
+.task-memo-actions{margin:7px 0 0 58px;}
 .task-memo-btn{background:transparent;border:none;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:10px;padding:3px 0;cursor:pointer;}
 .task-memo-btn.has-memo{color:var(--accent);}
 .task-memo{width:100%;margin-top:6px;min-height:46px;resize:vertical;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;line-height:1.6;padding:8px 9px;outline:none;}
@@ -249,7 +251,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="card">
       <div class="card-title">科目別計画</div>
       <div class="plan-summary" id="planSummary"></div>
-      <div class="plan-note">達成率・進捗率＝累積実績時間÷投下可能時間です。やることリストは、学習順序と完了状況の確認に使用します。</div>
+      <div class="plan-note">達成率＝累積実績時間÷投下可能時間、進捗率＝完了したタスク数÷やることリスト総数です。</div>
       <div id="subjectPlans"></div>
       <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
     </div>
@@ -494,10 +496,13 @@ function goPage(id,btn){
 function renderDash(){
   const examDate=getExamDate(),plans=getPlans(),now=new Date();
   updateSyncStatus();
-  let allocatedTotal=0,actualTotal=0;
+  let allocatedTotal=0,actualTotal=0,totalTasks=0,completedTasks=0;
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours||0;
     actualTotal+=getSubjectActualHours(sub.id);
+    const tasks=plans[sub.id].tasks||[];
+    totalTasks+=tasks.length;
+    completedTasks+=tasks.filter(t=>t.done).length;
   });
   if(!examDate){
     document.getElementById('dDays').textContent='–';
@@ -511,7 +516,7 @@ function renderDash(){
     document.getElementById('dWeeks').innerHTML=`${Math.floor(daysLeft/7)}<small>週</small>`;
     document.getElementById('dExamLabel').innerHTML=`試験日 <strong>${eDay.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})}</strong>`;
   }
-  const overallRate=allocatedTotal>0?actualTotal/allocatedTotal*100:0;
+  const overallProgressRate=totalTasks>0?completedTasks/totalTasks*100:0;
   document.getElementById('dTotalH').innerHTML=`${overallRate.toFixed(1)}<small>%</small>`;
   document.getElementById('dTodayH').innerHTML=`${actualTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('dStudyDays').innerHTML=`${allocatedTotal.toFixed(1)}<small>h</small>`;
@@ -574,23 +579,28 @@ const openTaskMemos=new Set();
 function clampPct(n){return Math.max(0,Math.min(100,Number.isFinite(n)?n:0));}
 function renderPlans(){
   const plans=getPlans();
-  let allocatedTotal=0,actualTotal=0;
+  let allocatedTotal=0,actualTotal=0,totalTasks=0,completedTasks=0;
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours;
     actualTotal+=getSubjectActualHours(sub.id);
+    const tasks=plans[sub.id].tasks||[];
+    totalTasks+=tasks.length;
+    completedTasks+=tasks.filter(t=>t.done).length;
   });
-  const overallRate=allocatedTotal>0?actualTotal/allocatedTotal*100:0;
+  const overallProgressRate=totalTasks>0?completedTasks/totalTasks*100:0;
   document.getElementById('planSummary').innerHTML=`
     <div class="plan-summary-item"><div class="lbl">全科目の投下可能時間</div><div class="val">${allocatedTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
     <div class="plan-summary-item"><div class="lbl">累積実績時間</div><div class="val">${actualTotal.toFixed(1)}<span style="font-size:11px">h</span></div></div>
-    <div class="plan-summary-item"><div class="lbl">全体の進捗率</div><div class="val">${overallRate.toFixed(1)}<span style="font-size:11px">%</span></div></div>`;
+    <div class="plan-summary-item"><div class="lbl">全体の進捗率</div><div class="val">${overallProgressRate.toFixed(1)}<span style="font-size:11px">%</span></div></div>`;
   document.getElementById('subjectPlans').innerHTML=SUBJECTS.map(sub=>renderSubjectPlan(sub,plans[sub.id])).join('');
 }
 function renderSubjectPlan(sub,plan){
   const actual=getSubjectActualHours(sub.id);
   const allocated=plan.allocatedHours||0;
-  const progressRate=allocated>0?actual/allocated*100:0;
+  const achievementRate=allocated>0?actual/allocated*100:0;
   const tasks=plan.tasks||[];
+  const completedCount=tasks.filter(t=>t.done).length;
+  const progressRate=tasks.length>0?completedCount/tasks.length*100:0;
   return `<div class="plan-subject" id="plan_${sub.id}">
     <div class="plan-subject-head"><span class="subj-dot" style="background:${sub.color}"></span><span class="plan-subject-name">${sub.name}</span></div>
     <div class="plan-grid">
@@ -598,8 +608,8 @@ function renderSubjectPlan(sub,plan){
       <div class="plan-field"><div class="plan-field-label">累積実績（自動）</div><div class="plan-metric" id="actual_${sub.id}">${actual.toFixed(1)}<small>h</small></div></div>
     </div>
     <div class="plan-bars">
-      <div class="plan-bar-row"><span>達成率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="achievementBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:${sub.color}"></div></div><span id="achievementRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
-      <div class="plan-bar-row"><span>進捗率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="progressBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:${sub.color}"></div></div><span id="progressRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
+      <div class="plan-bar-row"><span>達成率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="achievementBar_${sub.id}" style="width:${clampPct(achievementRate)}%;background:var(--accent)"></div></div><span id="achievementRate_${sub.id}">${achievementRate.toFixed(1)}%</span></div>
+      <div class="plan-bar-row"><span>進捗率</span><div class="plan-bar-wrap"><div class="plan-bar-fill" id="progressBar_${sub.id}" style="width:${clampPct(progressRate)}%;background:var(--green)"></div></div><span id="progressRate_${sub.id}">${progressRate.toFixed(1)}%</span></div>
     </div>
     <div class="task-section"><div class="task-title-row"><span class="task-title">やることリスト（上から実施）</span><button class="task-add" onclick="addTask('${sub.id}')">＋追加</button></div><div id="tasks_${sub.id}">${renderTasks(sub.id,tasks)}</div>${tasks.length>3?`<button class="task-toggle" id="taskToggle_${sub.id}" onclick="toggleTaskList('${sub.id}')">${expandedTaskLists.has(sub.id)?'折りたたむ':`すべて表示（${tasks.length}件）`}</button>`:''}</div>
   </div>`;
@@ -631,6 +641,7 @@ function renderTasks(subjectId,tasks){
   return `<div class="task-list">`+rows.map(({task,index,context})=>`<div class="task-item">
     ${context?`<span class="task-context ${context==='次にやる'?'next':''}">${context}</span>`:''}
     <div class="task-main">
+      <span class="task-number ${task.done?'done':''}">${String(index+1).padStart(2,'0')}</span>
       <input class="task-check" type="checkbox" ${task.done?'checked':''} onchange="toggleTask('${subjectId}',${index},this.checked)">
       <input class="task-text ${task.done?'done':''}" value="${escapeHtml(task.title||'')}" onchange="editTask('${subjectId}',${index},this.value)">
       <button class="task-order" onclick="moveTask('${subjectId}',${index},-1)" ${index===0?'disabled':''}>↑</button>
@@ -657,9 +668,12 @@ function collectPlansFromScreen(){
 function updatePlanPreview(subjectId){
   const actual=getSubjectActualHours(subjectId);
   const allocated=parseFloat(document.getElementById('allocated_'+subjectId)?.value)||0;
-  const progressRate=allocated>0?actual/allocated*100:0;
-  document.getElementById('achievementRate_'+subjectId).textContent=progressRate.toFixed(1)+'%';
-  document.getElementById('achievementBar_'+subjectId).style.width=clampPct(progressRate)+'%';
+  const achievementRate=allocated>0?actual/allocated*100:0;
+  document.getElementById('achievementRate_'+subjectId).textContent=achievementRate.toFixed(1)+'%';
+  document.getElementById('achievementBar_'+subjectId).style.width=clampPct(achievementRate)+'%';
+  const plan=getPlans()[subjectId]||{tasks:[]};
+  const tasks=plan.tasks||[];
+  const progressRate=tasks.length>0?tasks.filter(t=>t.done).length/tasks.length*100:0;
   document.getElementById('progressRate_'+subjectId).textContent=progressRate.toFixed(1)+'%';
   document.getElementById('progressBar_'+subjectId).style.width=clampPct(progressRate)+'%';
 }
