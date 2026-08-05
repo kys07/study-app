@@ -246,7 +246,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="card">
       <div class="card-title">科目別計画</div>
       <div class="plan-summary" id="planSummary"></div>
-      <div class="plan-note">時間消化率＝実績時間÷投下可能時間。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
+      <div class="plan-note">時間消化率＝実績時間÷投下可能時間。残り時間が未入力の場合は「投下可能時間－実績時間」を自動使用します。進捗見積率＝実績時間÷（実績時間＋残り時間見積もり）です。やることリストの件数は進捗率の計算に使いません。</div>
       <div id="subjectPlans"></div>
       <button class="save-btn" onclick="savePlans()">科目別計画を保存する</button>
     </div>
@@ -341,14 +341,14 @@ const DEFAULT_SCHEDULE={
 };
 const GIST_FILENAME = 'study-app-data.json';
 
-const DEFAULT_PLANS=Object.fromEntries(SUBJECTS.map(sub=>[sub.id,{allocatedHours:0,remainingEstimate:0,tasks:[]} ]));
+const DEFAULT_PLANS=Object.fromEntries(SUBJECTS.map(sub=>[sub.id,{allocatedHours:0,remainingEstimate:null,tasks:[]} ]));
 function getPlans(){
   const stored=load('plans',{}), merged={};
   SUBJECTS.forEach(sub=>{
     const p=stored[sub.id]||{};
     merged[sub.id]={
       allocatedHours:parseFloat(p.allocatedHours)||0,
-      remainingEstimate:parseFloat(p.remainingEstimate)||0,
+      remainingEstimate:(p.remainingEstimate===null||p.remainingEstimate===undefined||p.remainingEstimate==='')?null:(Number.isFinite(parseFloat(p.remainingEstimate))?parseFloat(p.remainingEstimate):null),
       tasks:Array.isArray(p.tasks)?p.tasks.map(t=>({...t,memo:typeof t?.memo==='string'?t.memo:''})):[],
       notes:typeof p.notes==='string'?p.notes:''
     };
@@ -358,6 +358,11 @@ function getPlans(){
 function getSubjectActualHours(subjectId){
   const logs=getLogs();
   return Object.values(logs).reduce((sum,day)=>sum+(parseFloat(day?.[subjectId])||0),0);
+}
+function getEffectiveRemaining(plan,actual){
+  return plan.remainingEstimate===null||plan.remainingEstimate===undefined
+    ? Math.max((parseFloat(plan.allocatedHours)||0)-actual,0)
+    : Math.max(parseFloat(plan.remainingEstimate)||0,0);
 }
 
 
@@ -490,7 +495,7 @@ function renderDash(){
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours||0;
     actualTotal+=getSubjectActualHours(sub.id);
-    remainingTotal+=plans[sub.id].remainingEstimate||0;
+    remainingTotal+=getEffectiveRemaining(plans[sub.id],getSubjectActualHours(sub.id));
   });
   if(!examDate){
     document.getElementById('dDays').textContent='–';
@@ -508,7 +513,7 @@ function renderDash(){
   document.getElementById('dTodayH').innerHTML=`${actualTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('dStudyDays').innerHTML=`${allocatedTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('todaySchedList').innerHTML=SUBJECTS.map(sub=>{
-    const p=plans[sub.id],actual=getSubjectActualHours(sub.id),forecast=actual+(p.remainingEstimate||0);
+    const p=plans[sub.id],actual=getSubjectActualHours(sub.id),forecast=actual+getEffectiveRemaining(p,actual);
     const rate=forecast>0?actual/forecast*100:0;
     const next=(p.tasks||[]).find(t=>!t.done);
     return `<div class="ts-row"><span class="ts-dot" style="background:${sub.color}"></span><span class="ts-name"><span style="display:block">${sub.name}</span><span style="display:block;font-size:10px;color:var(--muted);margin-top:2px">${next?'次：'+escapeHtml(next.title):'未完了タスクなし'}</span></span><span class="ts-planned">${rate.toFixed(1)}%</span></div>`;
@@ -569,7 +574,7 @@ function renderPlans(){
   SUBJECTS.forEach(sub=>{
     allocatedTotal+=plans[sub.id].allocatedHours;
     actualTotal+=getSubjectActualHours(sub.id);
-    remainingTotal+=plans[sub.id].remainingEstimate;
+    remainingTotal+=getEffectiveRemaining(plans[sub.id],getSubjectActualHours(sub.id));
   });
   const totalForecast=actualTotal+remainingTotal;
   document.getElementById('planSummary').innerHTML=`
@@ -581,7 +586,8 @@ function renderPlans(){
 }
 function renderSubjectPlan(sub,plan){
   const actual=getSubjectActualHours(sub.id);
-  const allocated=plan.allocatedHours||0,remaining=plan.remainingEstimate||0;
+  const allocated=plan.allocatedHours||0,remaining=getEffectiveRemaining(plan,actual);
+  const remainingInput=plan.remainingEstimate===null||plan.remainingEstimate===undefined?'':plan.remainingEstimate;
   const forecast=actual+remaining;
   const timeRate=allocated>0?actual/allocated*100:0;
   const progressRate=forecast>0?actual/forecast*100:0;
@@ -596,7 +602,7 @@ function renderSubjectPlan(sub,plan){
     <div class="plan-grid">
       <div class="plan-field"><div class="plan-field-label">投下可能時間</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="allocated_${sub.id}" value="${allocated}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
       <div class="plan-field"><div class="plan-field-label">累積実績（自動）</div><div class="plan-metric" id="actual_${sub.id}">${actual.toFixed(1)}<small>h</small></div></div>
-      <div class="plan-field"><div class="plan-field-label">最新の残り時間見積もり</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="remaining_${sub.id}" value="${remaining}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
+      <div class="plan-field"><div class="plan-field-label">最新の残り時間見積もり</div><div class="plan-number-wrap"><input class="plan-number" type="number" min="0" step="0.5" id="remaining_${sub.id}" value="${remainingInput}" placeholder="${Math.max(allocated-actual,0).toFixed(1)}" oninput="updatePlanPreview('${sub.id}')"><span class="plan-unit">h</span></div></div>
       <div class="plan-field"><div class="plan-field-label">最新の完了予測</div><div class="plan-metric" id="forecast_${sub.id}">${forecast.toFixed(1)}<small>h</small></div></div>
     </div>
     <div class="plan-bars">
@@ -650,7 +656,7 @@ function collectPlansFromScreen(){
   SUBJECTS.forEach(sub=>{
     const a=document.getElementById('allocated_'+sub.id),r=document.getElementById('remaining_'+sub.id);
     if(a) plans[sub.id].allocatedHours=parseFloat(a.value)||0;
-    if(r) plans[sub.id].remainingEstimate=parseFloat(r.value)||0;
+    if(r) plans[sub.id].remainingEstimate=r.value.trim()===''?null:Math.max(parseFloat(r.value)||0,0);
     const n=document.getElementById('notes_'+sub.id);if(n) plans[sub.id].notes=n.value;
   });
   return plans;
@@ -658,7 +664,9 @@ function collectPlansFromScreen(){
 function updatePlanPreview(subjectId){
   const actual=getSubjectActualHours(subjectId);
   const allocated=parseFloat(document.getElementById('allocated_'+subjectId)?.value)||0;
-  const remaining=parseFloat(document.getElementById('remaining_'+subjectId)?.value)||0;
+  const remainingEl=document.getElementById('remaining_'+subjectId);
+  const remaining=remainingEl&&remainingEl.value.trim()!==''?Math.max(parseFloat(remainingEl.value)||0,0):Math.max(allocated-actual,0);
+  if(remainingEl) remainingEl.placeholder=Math.max(allocated-actual,0).toFixed(1);
   const forecast=actual+remaining,timeRate=allocated>0?actual/allocated*100:0,progressRate=forecast>0?actual/forecast*100:0,diff=progressRate-timeRate;
   document.getElementById('forecast_'+subjectId).innerHTML=`${forecast.toFixed(1)}<small>h</small>`;
   document.getElementById('timeRate_'+subjectId).textContent=timeRate.toFixed(1)+'%';
