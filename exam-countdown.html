@@ -517,7 +517,7 @@ function renderDash(){
     document.getElementById('dExamLabel').innerHTML=`試験日 <strong>${eDay.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})}</strong>`;
   }
   const overallProgressRate=totalTasks>0?completedTasks/totalTasks*100:0;
-  document.getElementById('dTotalH').innerHTML=`${overallRate.toFixed(1)}<small>%</small>`;
+  document.getElementById('dTotalH').innerHTML=`${overallProgressRate.toFixed(1)}<small>%</small>`;
   document.getElementById('dTodayH').innerHTML=`${actualTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('dStudyDays').innerHTML=`${allocatedTotal.toFixed(1)}<small>h</small>`;
   document.getElementById('todaySchedList').innerHTML=SUBJECTS.map(sub=>{
